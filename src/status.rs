@@ -240,7 +240,7 @@ impl ScriptHashStatus {
     fn confirmed_height_entries<'a>(
         &'a self,
         chain: &'a Chain,
-    ) -> impl Iterator<Item = (usize, &[TxEntry])> + 'a {
+    ) -> impl Iterator<Item = (usize, &'a [TxEntry])> + 'a {
         self.confirmed
             .iter()
             .filter_map(move |(blockhash, entries)| {
@@ -252,7 +252,7 @@ impl ScriptHashStatus {
 
     /// Iterate through confirmed TxEntries.
     /// Skip entries from stale blocks.
-    fn confirmed_entries<'a>(&'a self, chain: &'a Chain) -> impl Iterator<Item = &TxEntry> + 'a {
+    fn confirmed_entries<'a>(&'a self, chain: &'a Chain) -> impl Iterator<Item = &'a TxEntry> + 'a {
         self.confirmed_height_entries(chain)
             .flat_map(|(_height, entries)| entries)
     }
