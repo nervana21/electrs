@@ -3,7 +3,7 @@ use bitcoin::consensus::{deserialize, serialize, Decodable};
 use bitcoin::secp256k1::PublicKey;
 use bitcoin::{BlockHash, OutPoint, Txid};
 use bitcoin_slices::{bsl, Visit, Visitor};
-use libbitcoinkernel_sys::BlockUndo;
+use bitcoinkernel::BlockUndo;
 use rayon::prelude::*;
 use silentpayments::utils::receiving::{calculate_tweak_data, get_pubkey_from_input};
 use std::ops::ControlFlow;

@@ -1,5 +1,5 @@
 use env_logger::Builder;
-use libbitcoinkernel_sys::{
+use bitcoinkernel::{
     ChainType, Context, ContextBuilder, KernelError, KernelNotificationInterfaceCallbackHolder,
     Log, Logger,
 };
