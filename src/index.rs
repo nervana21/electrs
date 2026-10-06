@@ -3,7 +3,7 @@ use bitcoin::consensus::{deserialize, serialize, Decodable};
 use bitcoin::secp256k1::PublicKey;
 use bitcoin::{BlockHash, OutPoint, Txid};
 use bitcoin_slices::{bsl, Visit, Visitor};
-use bitcoinkernel::BlockUndo;
+use bitcoinkernel::{prelude::*, BlockSpentOutputs};
 use rayon::prelude::*;
 use silentpayments::utils::receiving::{calculate_tweak_data, get_pubkey_from_input};
 use std::ops::ControlFlow;
@@ -645,14 +645,14 @@ fn scan_single_block_for_silent_payments(
 pub fn scan_single_block_for_silent_payments_without_daemon(
     block_height: usize,
     block: SerBlock,
-    undo: BlockUndo,
+    undo: BlockSpentOutputs,
     min_dust: u64,
 ) -> Row {
     struct IndexBlockVisitor<'a> {
         min_dust: u64,
         tweak_block_data: &'a mut TweakBlockData,
         tx_num: u64,
-        undo_block_data: BlockUndo,
+        undo_block_data: BlockSpentOutputs,
     }
 
     impl<'a> Visitor for IndexBlockVisitor<'a> {
@@ -708,14 +708,19 @@ pub fn scan_single_block_for_silent_payments_without_daemon(
                         .lock()
                         .unwrap()
                         .push((prev_txid.to_string(), prev_vout));
-                    let undo_prevout = self
+                    let undo_prevout_script = self
                         .undo_block_data
-                        .get_prevout_by_index(self.tx_num - 1, vin as u64)
-                        .unwrap();
+                        .transaction_spent_outputs((self.tx_num - 1) as usize)
+                        .unwrap()
+                        .coin(vin)
+                        .unwrap()
+                        .output()
+                        .script_pubkey()
+                        .to_bytes();
                     match get_pubkey_from_input(
                         input.script_sig.as_bytes(),
                         &input.witness.to_vec(),
-                        &undo_prevout.script_pubkey,
+                        &undo_prevout_script,
                     ) {
                         Ok(Some(pubkey)) => pubkeys.lock().unwrap().push(pubkey),
                         Ok(None) => (),

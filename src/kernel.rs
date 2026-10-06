@@ -1,8 +1,5 @@
 use env_logger::Builder;
-use bitcoinkernel::{
-    ChainType, Context, ContextBuilder, KernelError, KernelNotificationInterfaceCallbackHolder,
-    Log, Logger,
-};
+use bitcoinkernel::{ChainType, Context, ContextBuilder, KernelError, Log, Logger};
 use log::LevelFilter;
 
 pub struct MainLog {}
@@ -10,12 +7,12 @@ pub struct MainLog {}
 impl Log for MainLog {
     fn log(&self, message: &str) {
         log::info!(
-            target: "libbitcoinkernel", 
+            target: "libbitcoinkernel",
             "{}", message.strip_suffix("\r\n").or_else(|| message.strip_suffix('\n')).unwrap_or(message));
     }
 }
 
-pub fn setup_logging() -> Result<Logger<MainLog>, KernelError> {
+pub fn setup_logging() -> Result<Logger, KernelError> {
     let mut builder = Builder::from_default_env();
     builder.filter(None, LevelFilter::Info).init();
     Logger::new(MainLog {})
@@ -24,17 +21,15 @@ pub fn setup_logging() -> Result<Logger<MainLog>, KernelError> {
 pub fn create_context(network: ChainType) -> Context {
     ContextBuilder::new()
         .chain_type(network)
-        .unwrap()
-        .kn_callbacks(Box::new(KernelNotificationInterfaceCallbackHolder {
-            kn_block_tip: Box::new(|_state, _block_index| {}),
-            kn_header_tip: Box::new(|_state, _height, _timestamp, _presync| {}),
-            kn_progress: Box::new(|_title, _progress, _resume_possible| {}),
-            kn_warning_set: Box::new(|_warning, _message| {}),
-            kn_warning_unset: Box::new(|_warning| {}),
-            kn_flush_error: Box::new(|_message| {}),
-            kn_fatal_error: Box::new(|_message| {}),
-        }))
-        .unwrap()
+        .notifications(|registry| {
+            registry.register_block_tip(|_state, _hash, _progress| {});
+            registry.register_header_tip(|_state, _height, _timestamp, _presync| {});
+            registry.register_progress(|_title, _progress, _resume_possible| {});
+            registry.register_warning_set(|_warning, _message| {});
+            registry.register_warning_unset(|_warning| {});
+            registry.register_flush_error(|_message| {});
+            registry.register_fatal_error(|_message| {});
+        })
         .build()
         .unwrap()
 }

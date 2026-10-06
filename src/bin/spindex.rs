@@ -1,9 +1,6 @@
 use bitcoin::consensus::serialize;
 use clap::Parser;
-use bitcoinkernel::{
-    BlockManagerOptions, ChainType, ChainstateLoadOptions, ChainstateManager,
-    ChainstateManagerOptions,
-};
+use bitcoinkernel::{ChainType, ChainstateManagerBuilder};
 use rayon::prelude::*;
 use std::path::PathBuf;
 
@@ -37,10 +34,10 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let chain_type = match args.network.to_lowercase().as_str() {
-        "mainnet" => ChainType::MAINNET,
-        "testnet" => ChainType::TESTNET,
-        "regtest" => ChainType::REGTEST,
-        "signet" => ChainType::SIGNET,
+        "mainnet" => ChainType::Mainnet,
+        "testnet" => ChainType::Testnet,
+        "regtest" => ChainType::Regtest,
+        "signet" => ChainType::Signet,
         _ => {
             eprintln!("Invalid network type: {}", args.network);
             std::process::exit(1);
@@ -52,25 +49,17 @@ fn main() {
     // Set up the kernel
     let _ = setup_logging().unwrap();
     let context = create_context(chain_type);
-    let chainman = ChainstateManager::new(
-        ChainstateManagerOptions::new(&context, &data_dir).unwrap(),
-        BlockManagerOptions::new(&context, &blocks_dir).unwrap(),
-        &context,
-    )
-    .unwrap();
-    chainman
-        .load_chainstate(
-            ChainstateLoadOptions::new()
-                .set_chainstate_readonly(true)
-                .unwrap(),
-        )
+    let chainman = ChainstateManagerBuilder::new(&context, &data_dir, &blocks_dir)
+        .unwrap()
+        .build()
         .unwrap();
     chainman.import_blocks().unwrap();
 
     // Open the database
     let store = DBStore::open(&PathBuf::from(args.db), None, false).unwrap();
     let batch_size = 2000;
-    let block_numbers = args.birthday..chainman.get_block_index_tip().info().height;
+    let tip_height = chainman.active_chain().height();
+    let block_numbers = args.birthday..tip_height;
     block_numbers
         .collect::<Vec<_>>()
         .chunks(batch_size)
@@ -80,9 +69,14 @@ fn main() {
             let results: Vec<Row> = chunk
                 .par_iter()
                 .map(|&height| {
-                    let block_index = chainman.get_block_index_by_height(height).unwrap();
-                    let raw_block: Vec<u8> = chainman.read_block_data(&block_index).unwrap().into();
-                    let undo = chainman.read_undo_data(&block_index).unwrap();
+                    let block_index = chainman
+                        .active_chain()
+                        .at_height(height as usize)
+                        .unwrap();
+                    let raw_block: Vec<u8> = (&chainman.read_block_data(&block_index).unwrap())
+                        .try_into()
+                        .unwrap();
+                    let undo = chainman.read_spent_outputs(&block_index).unwrap();
                     scan_single_block_for_silent_payments_without_daemon(
                         height as usize,
                         raw_block,
@@ -92,9 +86,12 @@ fn main() {
                 })
                 .collect();
             let block_index = chainman
-                .get_block_index_by_height(*chunk.last().unwrap())
+                .active_chain()
+                .at_height(*chunk.last().unwrap() as usize)
                 .unwrap();
-            let last_block: Vec<u8> = chainman.read_block_data(&block_index).unwrap().into();
+            let last_block: Vec<u8> = (&chainman.read_block_data(&block_index).unwrap())
+                .try_into()
+                .unwrap();
             let block =
                 bsl::Block::visit(&last_block, &mut bitcoin_slices::EmptyVisitor {}).unwrap();
             let block_hash = block.parsed().block_hash();
