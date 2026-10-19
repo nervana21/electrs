@@ -40,7 +40,7 @@ signal-hook = "0.3"
 silentpayments = "0.1.1"
 tiny_http = { version = "0.12", optional = true }
 clap = { version = "4.0", features = ["derive"] }
-bitcoinkernel = { git = "https://github.com/nervana21/rust-bitcoinkernel", rev = "0a6c42520c8614b1d3a09ee9f4b40600a6b8b81e" }
+bitcoinkernel = { git = "https://github.com/nervana21/rust-bitcoinkernel", rev = "3ea1f48fc5626ad389b0017b580c051f26640c87" }
 
 [dependencies.electrs-rocksdb]
 version = "0.19.0-e3"
